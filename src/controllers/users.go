@@ -95,6 +95,14 @@ func CreateUser(c *gin.Context) {
 	newUser, err := models.CreateUser(data)
 
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "pq: duplicate key value") {
+			c.JSON(http.StatusInternalServerError, &errResponse{
+				Success: false,
+				Message: "Email already exists",
+			})
+			return
+		}
+
 		log.Fatalln(err)
 		c.JSON(http.StatusInternalServerError, &errResponse{
 			Success: false,

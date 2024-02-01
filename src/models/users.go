@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	"github.com/mfdrfauzi/fwg17-go-backend/src/lib"
 )
 
@@ -40,11 +39,14 @@ func CreateUser(data User) (User, error) {
 	RETURNING *`
 
 	result := User{}
-	rows, err := db.NamedQuery(sql, data)
+	rows, err := db.NamedQuery(sql, &data)
+	if err != nil {
+		return result, err
+	}
 
 	for rows.Next() {
 		rows.StructScan(&result)
 	}
 
-	return result, err
+	return result, nil
 }
