@@ -2,7 +2,11 @@ module github.com/mfdrfauzi/fwg17-go-backend
 
 go 1.21.6
 
-require github.com/gin-gonic/gin v1.9.1
+require (
+	github.com/gin-gonic/gin v1.9.1
+	github.com/jmoiron/sqlx v1.3.5
+	github.com/lib/pq v1.2.0
+)
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

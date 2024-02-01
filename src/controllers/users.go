@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mfdrfauzi/fwg17-go-backend/src/models"
 )
 
 type Users struct {
@@ -34,31 +37,17 @@ type errResponse struct {
 	Message string `json:"message"`
 }
 
-var users = []Users{
-	{
-		Id:       1,
-		Email:    "tony.stark@gmail.com",
-		Password: "tony1234",
-	},
-	{
-		Id:       2,
-		Email:    "thor.thunder@gmail.com",
-		Password: "kingofthunder",
-	},
-	{
-		Id:       3,
-		Email:    "peter.spider@gmail.com",
-		Password: "parker123",
-	},
-	{
-		Id:       4,
-		Email:    "stephen.strange@gmail.com",
-		Password: "strange1212",
-	},
-}
-
 func ListAllUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.Query("page"))
+	users, err := models.GetAllUser()
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, &errResponse{
+			Success: false,
+			Message: "Internal Server Error",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, &responseList{
 		Success: true,
@@ -68,24 +57,25 @@ func ListAllUsers(c *gin.Context) {
 		},
 		Results: users,
 	})
-
 }
 
 func DetailUser(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
+	users, err := models.FindOneUser(id)
 
-	var getUser *Users
-	for _, user := range users {
-		if user.Id == id {
-			getUser = &user
-			break
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "sql: no rows") {
+			c.JSON(http.StatusInternalServerError, &errResponse{
+				Success: false,
+				Message: "User Not Found",
+			})
+			return
 		}
-	}
 
-	if getUser == nil {
-		c.JSON(http.StatusNotFound, &errResponse{
+		log.Fatalln(err)
+		c.JSON(http.StatusInternalServerError, &errResponse{
 			Success: false,
-			Message: "User not found",
+			Message: "Internal Server Error",
 		})
 		return
 	}
@@ -93,24 +83,25 @@ func DetailUser(c *gin.Context) {
 	c.JSON(http.StatusOK, &response{
 		Success: true,
 		Message: "Detail Users",
-		Results: getUser,
+		Results: users,
 	})
 }
 
 func CreateUser(c *gin.Context) {
-	defer panicHandle(c)
+	data := models.User{}
 
-	newUser := Users{}
+	c.Bind(&data)
 
-	c.Bind(&newUser)
+	newUser, err := models.CreateUser(data)
 
-	if newUser.Password == "" {
-		panic("Password cannot be empty")
+	if err != nil {
+		log.Fatalln(err)
+		c.JSON(http.StatusInternalServerError, &errResponse{
+			Success: false,
+			Message: "Internal Server Error",
+		})
+		return
 	}
-
-	newUser.Id = len(users) + 1
-
-	users = append(users, newUser)
 
 	c.JSON(http.StatusOK, &response{
 		Success: true,
@@ -119,83 +110,83 @@ func CreateUser(c *gin.Context) {
 	})
 }
 
-func UpdateUser(c *gin.Context) {
-	defer panicHandle(c)
+// func UpdateUser(c *gin.Context) {
+// 	defer panicHandle(c)
 
-	id, _ := strconv.Atoi(c.Param("id"))
-	updateUser := Users{}
+// 	id, _ := strconv.Atoi(c.Param("id"))
+// 	updateUser := Users{}
 
-	var getUser *Users
-	for i, user := range users {
-		if user.Id == id {
-			getUser = &users[i]
-			break
-		}
-	}
+// 	var getUser *Users
+// 	for i, user := range users {
+// 		if user.Id == id {
+// 			getUser = &users[i]
+// 			break
+// 		}
+// 	}
 
-	if getUser == nil {
-		panic("User not found")
-	}
+// 	if getUser == nil {
+// 		panic("User not found")
+// 	}
 
-	c.Bind(&updateUser)
+// 	c.Bind(&updateUser)
 
-	if updateUser.Email != "" {
-		getUser.Email = updateUser.Email
-	}
+// 	if updateUser.Email != "" {
+// 		getUser.Email = updateUser.Email
+// 	}
 
-	if updateUser.Password != "" {
-		getUser.Password = updateUser.Password
-	}
+// 	if updateUser.Password != "" {
+// 		getUser.Password = updateUser.Password
+// 	}
 
-	if updateUser.Email == "" && updateUser.Password == "" {
-		panic("No data has been changed")
-	}
+// 	if updateUser.Email == "" && updateUser.Password == "" {
+// 		panic("No data has been changed")
+// 	}
 
-	c.JSON(http.StatusOK, &response{
-		Success: true,
-		Message: "User Updated Successfully",
-		Results: getUser,
-	})
-}
+// 	c.JSON(http.StatusOK, &response{
+// 		Success: true,
+// 		Message: "User Updated Successfully",
+// 		Results: getUser,
+// 	})
+// }
 
-func DeleteUser(c *gin.Context) {
-	defer panicHandle(c)
+// func DeleteUser(c *gin.Context) {
+// 	defer panicHandle(c)
 
-	id, _ := strconv.Atoi(c.Param("id"))
+// 	id, _ := strconv.Atoi(c.Param("id"))
 
-	index := -1
-	for i, user := range users {
-		if user.Id == id {
-			index = i
-			break
-		}
-	}
+// 	index := -1
+// 	for i, user := range users {
+// 		if user.Id == id {
+// 			index = i
+// 			break
+// 		}
+// 	}
 
-	if index != -1 {
-		deletedUser := users[index]
-		users = append(users[:index], users[index+1:]...)
-		c.JSON(http.StatusOK, &response{
-			Success: true,
-			Message: "User deleted successfully",
-			Results: deletedUser,
-		})
-	} else {
-		panic("User not found")
-	}
-}
+// 	if index != -1 {
+// 		deletedUser := users[index]
+// 		users = append(users[:index], users[index+1:]...)
+// 		c.JSON(http.StatusOK, &response{
+// 			Success: true,
+// 			Message: "User deleted successfully",
+// 			Results: deletedUser,
+// 		})
+// 	} else {
+// 		panic("User not found")
+// 	}
+// }
 
-func panicHandle(c *gin.Context) {
-	if r := recover(); r != nil {
-		var errMsg string
-		switch v := r.(type) {
-		case string:
-			errMsg = v
-		default:
-			errMsg = "Internal Server Error"
-		}
-		c.JSON(http.StatusInternalServerError, &errResponse{
-			Success: false,
-			Message: errMsg,
-		})
-	}
-}
+// func panicHandle(c *gin.Context) {
+// 	if r := recover(); r != nil {
+// 		var errMsg string
+// 		switch v := r.(type) {
+// 		case string:
+// 			errMsg = v
+// 		default:
+// 			errMsg = "Internal Server Error"
+// 		}
+// 		c.JSON(http.StatusInternalServerError, &errResponse{
+// 			Success: false,
+// 			Message: errMsg,
+// 		})
+// 	}
+// }

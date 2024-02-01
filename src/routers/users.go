@@ -9,6 +9,6 @@ func UserRouter(r *gin.RouterGroup) {
 	r.GET("", controller.ListAllUsers)
 	r.GET("/:id", controller.DetailUser)
 	r.POST("", controller.CreateUser)
-	r.PATCH("/:id", controller.UpdateUser)
-	r.DELETE("/:id", controller.DeleteUser)
+	// r.PATCH("/:id", controller.UpdateUser)
+	// r.DELETE("/:id", controller.DeleteUser)
 }
