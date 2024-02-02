@@ -17,7 +17,10 @@ type Users struct {
 }
 
 type pageInfo struct {
-	Page int `json:"page"`
+	Page      int `json:"page"`
+	TotalPage int `json:"totalPage"`
+	NextPage  int `json:"nextPage,omitempty"`
+	PrevPage  int `json:"prevPage,omitempty"`
 }
 
 type responseList struct {
@@ -39,9 +42,18 @@ type errResponse struct {
 
 func ListAllUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.Query("page"))
-	users, err := models.GetAllUser()
+	search := c.Query("search")
+	sortBy := c.Query("sortBy")
+	orderBy := c.Query("orderBy")
+
+	if page <= 0 {
+		page = 1
+	}
+
+	users, totalPage, err := models.GetAllUser(search, sortBy, orderBy, page)
 
 	if err != nil {
+		log.Fatalln(err)
 		c.JSON(http.StatusInternalServerError, &errResponse{
 			Success: false,
 			Message: "Internal Server Error",
@@ -49,13 +61,33 @@ func ListAllUsers(c *gin.Context) {
 		return
 	}
 
+	var result interface{}
+	if len(users) == 0 {
+		result = "User Not Found"
+	} else {
+		result = users
+	}
+
+	nextPage := page + 1
+	prevPage := page - 1
+	if nextPage > totalPage {
+		nextPage = 0
+	}
+
+	if prevPage < 1 {
+		prevPage = 0
+	}
+
 	c.JSON(http.StatusOK, &responseList{
 		Success: true,
 		Message: "List All Users",
 		PageInfo: pageInfo{
-			Page: page,
+			Page:      page,
+			TotalPage: totalPage,
+			NextPage:  nextPage,
+			PrevPage:  prevPage,
 		},
-		Results: users,
+		Results: result,
 	})
 }
 
@@ -118,83 +150,63 @@ func CreateUser(c *gin.Context) {
 	})
 }
 
-// func UpdateUser(c *gin.Context) {
-// 	defer panicHandle(c)
+func UpdateUser(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	data := models.User{}
 
-// 	id, _ := strconv.Atoi(c.Param("id"))
-// 	updateUser := Users{}
+	c.Bind(&data)
+	data.Id = id
 
-// 	var getUser *Users
-// 	for i, user := range users {
-// 		if user.Id == id {
-// 			getUser = &users[i]
-// 			break
-// 		}
-// 	}
+	user, err := models.UpdateUser(data)
 
-// 	if getUser == nil {
-// 		panic("User not found")
-// 	}
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "pq: duplicate key value") {
+			c.JSON(http.StatusInternalServerError, &errResponse{
+				Success: false,
+				Message: "Email already exists",
+			})
+			return
+		}
 
-// 	c.Bind(&updateUser)
+		log.Fatalln(err)
+		c.JSON(http.StatusInternalServerError, &errResponse{
+			Success: false,
+			Message: "Internal Server Error",
+		})
+		return
+	}
 
-// 	if updateUser.Email != "" {
-// 		getUser.Email = updateUser.Email
-// 	}
+	c.JSON(http.StatusOK, &response{
+		Success: true,
+		Message: "User Updated Successfully",
+		Results: user,
+	})
+}
 
-// 	if updateUser.Password != "" {
-// 		getUser.Password = updateUser.Password
-// 	}
+func DeleteUser(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	users, err := models.DeleteUser(id)
 
-// 	if updateUser.Email == "" && updateUser.Password == "" {
-// 		panic("No data has been changed")
-// 	}
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "sql: no rows") {
+			c.JSON(http.StatusInternalServerError, &errResponse{
+				Success: false,
+				Message: "User Not Found",
+			})
+			return
+		}
 
-// 	c.JSON(http.StatusOK, &response{
-// 		Success: true,
-// 		Message: "User Updated Successfully",
-// 		Results: getUser,
-// 	})
-// }
+		log.Fatalln(err)
+		c.JSON(http.StatusInternalServerError, &errResponse{
+			Success: false,
+			Message: "Internal Server Error",
+		})
+		return
+	}
 
-// func DeleteUser(c *gin.Context) {
-// 	defer panicHandle(c)
-
-// 	id, _ := strconv.Atoi(c.Param("id"))
-
-// 	index := -1
-// 	for i, user := range users {
-// 		if user.Id == id {
-// 			index = i
-// 			break
-// 		}
-// 	}
-
-// 	if index != -1 {
-// 		deletedUser := users[index]
-// 		users = append(users[:index], users[index+1:]...)
-// 		c.JSON(http.StatusOK, &response{
-// 			Success: true,
-// 			Message: "User deleted successfully",
-// 			Results: deletedUser,
-// 		})
-// 	} else {
-// 		panic("User not found")
-// 	}
-// }
-
-// func panicHandle(c *gin.Context) {
-// 	if r := recover(); r != nil {
-// 		var errMsg string
-// 		switch v := r.(type) {
-// 		case string:
-// 			errMsg = v
-// 		default:
-// 			errMsg = "Internal Server Error"
-// 		}
-// 		c.JSON(http.StatusInternalServerError, &errResponse{
-// 			Success: false,
-// 			Message: errMsg,
-// 		})
-// 	}
-// }
+	c.JSON(http.StatusOK, &response{
+		Success: true,
+		Message: "Deleted Users",
+		Results: users,
+	})
+}
