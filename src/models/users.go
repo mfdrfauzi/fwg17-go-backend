@@ -22,14 +22,13 @@ type User struct {
 const limit = 5
 const defaultPage = 1
 
-func totalCount(keyword string) (int, error) {
+func totalCount() (int, error) {
 	sql := `
 		SELECT COUNT(*) as total
 		FROM "users"
-		WHERE "email" ILIKE $1
 	`
 	var total int
-	err := db.QueryRow(sql, "%"+keyword+"%").Scan(&total)
+	err := db.QueryRow(sql).Scan(&total)
 	if err != nil {
 		return 0, err
 	}
@@ -59,7 +58,8 @@ func GetAllUser(keyword, sortBy, orderBy string, page int) ([]User, int, error) 
 		"id", 
 		"email",
 		"password",
-		"createdAt"
+		"createdAt",
+		"updatedAt"
 		FROM "users"
 		WHERE "email" ILIKE $1
 		ORDER BY %s %s
@@ -72,7 +72,7 @@ func GetAllUser(keyword, sortBy, orderBy string, page int) ([]User, int, error) 
 		return nil, 0, err
 	}
 
-	totalCount, err := totalCount(keyword)
+	totalCount, err := totalCount()
 	if err != nil {
 		return nil, 0, err
 	}
@@ -81,10 +81,17 @@ func GetAllUser(keyword, sortBy, orderBy string, page int) ([]User, int, error) 
 	return users, totalPage, nil
 }
 
-func FindOneUser(id int) (User, error) {
+func GetOneUser(id int) (User, error) {
 	sql := `SELECT * FROM "users" WHERE id=$1`
 	data := User{}
 	err := db.Get(&data, sql, id)
+	return data, err
+}
+
+func GetOneUserByEmail(email string) (User, error) {
+	sql := `SELECT * FROM "users" WHERE "email"=$1`
+	data := User{}
+	err := db.Get(&data, sql, email)
 	return data, err
 }
 
@@ -111,8 +118,9 @@ func UpdateUser(data User) (User, error) {
 	sql := `
 	UPDATE "users"
 	SET
-	email=COALESCE(NULLIF(:email,''),email),
-	password=COALESCE(NULLIF(:password,''),password)
+	"email"=COALESCE(NULLIF(:email,''),email),
+	"password"=COALESCE(NULLIF(:password,''),password),
+	"updatedAt" = NOW()
 	WHERE id=:id
 	RETURNING *`
 
